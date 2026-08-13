@@ -7,7 +7,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 file(GLOB_RECURSE SOURCES "src/*.cpp" "src/*.h")
 
 # Добавляем флаг WIN32, чтобы CMake ожидал WinMain вместо main
-add_executable(GTAMapEditor WIN32 ${SOURCES})
+add_executable(GTAMapEditor WIN32 ${SOURCES} "src/Renderer/Mesh.h" "src/GTA/DFF/DFFParser.h")
 
 target_include_directories(GTAMapEditor PRIVATE src)
 

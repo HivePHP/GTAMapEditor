@@ -18,9 +18,12 @@ public:
     void SetIDEData(const std::vector<IDEObject>& ideData);
     void SetIPLData(const std::vector<IPLPlacement>& iplData);
 
+    // Добавленный геттер для получения IPL данных на 3D-сцене
+    const std::vector<IPLPlacement>& GetIPLData() const { return m_IPLData; }
+
     bool IsKeyPressed(int key) const;
     bool IsRightMouseButtonPressed() const;
-    void GetMousePosition(int& x, int& y) const; // Изменили float на int
+    void GetMousePosition(int& x, int& y) const;
 
 private:
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);
