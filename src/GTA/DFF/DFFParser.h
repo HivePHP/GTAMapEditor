@@ -33,7 +33,7 @@ private:
                     return true;
                 }
             }
-            // Контейнерные чанки (Clump, GeometryList, Extension) — заходим внутрь
+            // Контейнерные чанки (Clump, GeometryList, Extension)
             else if (header.type == 0x10 || header.type == 0x1A || header.type == 0x03) {
                 if (ParseChunks(chunkData, nextChunk, outMesh)) {
                     return true;
@@ -53,10 +53,9 @@ private:
         std::memcpy(&structHeader, ptr, sizeof(RwHeader));
         ptr += sizeof(RwHeader);
 
-        if (structHeader.type != 0x01) return false; // Ожидается STRUCT чанк
+        if (structHeader.type != 0x01) return false;
         const char* sPtr = ptr;
 
-        // Читаем основные параметры геометрии GTA SA
         uint32_t format;
         std::memcpy(&format, sPtr, 4);
         int32_t numTriangles;
@@ -68,43 +67,44 @@ private:
 
         sPtr += 16;
 
-        // Проверяем адекватность размеров во избежание мусора
-        if (numVertices <= 0 || numVertices > 150000 || numTriangles <= 0 || numTriangles > 300000) {
+        if (numVertices <= 0 || numVertices > 200000 || numTriangles <= 0 || numTriangles > 400000) {
             return false;
         }
 
-        // В RenderWare для GTA SA после заголовка идут свойства материала (если версия стандартная)
-        // Пропускаем 12 байт surface properties (ambient, diffuse, specular)
+        // Surface properties (12 байт)
         sPtr += 12;
 
-        // Если цвета вершин присутствуют в формате (bit 0x04)
+        // Цвета вершин (если есть)
         bool hasColors = (format & 0x00000004) != 0;
-        // Если текстурные координаты присутствуют (bit 0x01 или 0x100)
-        bool hasTexCoords = (format & 0x00000008) != 0 || (format & 0x00000100) != 0;
-
-        if (hasColors) sPtr += numVertices * 4;
+        if (hasColors) {
+            sPtr += numVertices * 4;
+        }
 
         // Текстурные координаты (U, V)
+        bool hasTexCoords = (format & 0x00000008) != 0 || (format & 0x00000100) != 0;
         std::vector<float> uvs(numVertices * 2, 0.0f);
         if (hasTexCoords) {
             std::memcpy(uvs.data(), sPtr, numVertices * 2 * sizeof(float));
             sPtr += numVertices * 2 * sizeof(float);
         }
 
-        // Чтение треугольников (RwTriangle: v1, v2, materialIndex, v3)
-        struct RwTriangle {
-            uint16_t v2;
-            uint16_t v1;
+        // ВАЖНО: Реальная структура RwTriangle в памяти RenderWare:
+        // [1] VertIndex[1] (2 байта)
+        // [2] VertIndex[0] (2 байта)
+        // [3] MaterialIndex (2 байта)
+        // [4] VertIndex[2] (2 байта)
+        struct RawRwTriangle {
+            uint16_t vert1;
+            uint16_t vert0;
             uint16_t materialIndex;
-            uint16_t v0;
+            uint16_t vert2;
         };
 
-        std::vector<RwTriangle> triangles(numTriangles);
-        std::memcpy(triangles.data(), sPtr, numTriangles * sizeof(RwTriangle));
-        sPtr += numTriangles * sizeof(RwTriangle);
+        std::vector<RawRwTriangle> triangles(numTriangles);
+        std::memcpy(triangles.data(), sPtr, numTriangles * sizeof(RawRwTriangle));
+        sPtr += numTriangles * sizeof(RawRwTriangle);
 
-        // Морф-таргеты (сфера охвата + сами вершины и нормали)
-        // Пропускаем сфера охвата (16 байт) + флаги (8 байт)
+        // Морф-таргет: сфера охвата (16 байт) + флаги вершин/нормалей (8 байт)
         sPtr += 24;
 
         // Вершины (positions)
@@ -119,7 +119,7 @@ private:
             std::memcpy(normals.data(), sPtr, numVertices * 3 * sizeof(float));
         }
 
-        // Заполняем наш универсальный меш
+        // Заполняем меш
         outMesh.vertices.resize(numVertices);
         for (int i = 0; i < numVertices; ++i) {
             outMesh.vertices[i] = {
@@ -129,11 +129,12 @@ private:
             };
         }
 
+        // Правильная сборка индексов в порядке vert0, vert1, vert2
         outMesh.indices.resize(numTriangles * 3);
         for (int i = 0; i < numTriangles; ++i) {
-            outMesh.indices[i * 3 + 0] = triangles[i].v0;
-            outMesh.indices[i * 3 + 1] = triangles[i].v1;
-            outMesh.indices[i * 3 + 2] = triangles[i].v2;
+            outMesh.indices[i * 3 + 0] = triangles[i].vert0;
+            outMesh.indices[i * 3 + 1] = triangles[i].vert1;
+            outMesh.indices[i * 3 + 2] = triangles[i].vert2;
         }
 
         outMesh.UploadToGPU();
