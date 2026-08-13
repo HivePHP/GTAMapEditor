@@ -3,7 +3,6 @@
 #include <commctrl.h>
 #include <string>
 #include <vector>
-#include <utility>
 
 #include "../GTA/IDE/IDETypes.h"
 #include "../GTA/IPL/IPLTypes.h"
@@ -16,14 +15,12 @@ public:
     HWND GetHWND() const { return m_hWnd; }
     bool ProcessMessages();
 
-    // API для передачи данных в UI
     void SetIDEData(const std::vector<IDEObject>& ideData);
     void SetIPLData(const std::vector<IPLPlacement>& iplData);
 
-    // Методы ввода для камеры
     bool IsKeyPressed(int key) const;
     bool IsRightMouseButtonPressed() const;
-    std::pair<float, float> GetMousePosition() const;
+    void GetMousePosition(int& x, int& y) const; // Изменили float на int
 
 private:
     static LRESULT CALLBACK WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam);

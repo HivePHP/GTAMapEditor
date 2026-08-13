@@ -13,9 +13,7 @@ Win32Window::Win32Window(const wchar_t* title, int width, int height) {
     RegisterClassW(&wc);
 
     m_hWnd = CreateWindowExW(
-        0,
-        L"MapEditorWindowClass",
-        title,
+        0, L"MapEditorWindowClass", title,
         WS_OVERLAPPEDWINDOW | WS_CLIPCHILDREN | WS_VISIBLE,
         CW_USEDEFAULT, CW_USEDEFAULT, width, height,
         NULL, NULL, GetModuleHandle(NULL), this
@@ -31,9 +29,7 @@ Win32Window::~Win32Window() {
 bool Win32Window::ProcessMessages() {
     MSG msg = { 0 };
     while (PeekMessage(&msg, NULL, 0, 0, PM_REMOVE)) {
-        if (msg.message == WM_QUIT) {
-            return false;
-        }
+        if (msg.message == WM_QUIT) return false;
         TranslateMessage(&msg);
         DispatchMessage(&msg);
     }
@@ -48,41 +44,31 @@ const wchar_t* Win32Window::ToWChar(const std::string& str) {
 }
 
 void Win32Window::CreateUI() {
-    INITCOMMONCONTROLSEX icex;
-    icex.dwSize = sizeof(INITCOMMONCONTROLSEX);
-    icex.dwICC = ICC_LISTVIEW_CLASSES | ICC_TAB_CLASSES;
+    INITCOMMONCONTROLSEX icex = { sizeof(INITCOMMONCONTROLSEX), ICC_LISTVIEW_CLASSES | ICC_TAB_CLASSES };
     InitCommonControlsEx(&icex);
 
-    // Панель вкладок (слева)
     m_hTab = CreateWindowW(WC_TABCONTROLW, L"", WS_CHILD | WS_CLIPSIBLINGS | WS_VISIBLE,
         0, 0, 400, 720, m_hWnd, NULL, GetModuleHandle(NULL), NULL);
 
-    TCITEMW tie = { 0 };
-    tie.mask = TCIF_TEXT;
-    tie.pszText = const_cast<LPWSTR>(L"IDE Objects");
+    TCITEMW tie = { TCIF_TEXT, 0, 0, const_cast<LPWSTR>(L"IDE Objects"), 0, 0 };
     TabCtrl_InsertItem(m_hTab, 0, &tie);
     tie.pszText = const_cast<LPWSTR>(L"IPL Placements");
     TabCtrl_InsertItem(m_hTab, 1, &tie);
 
-    // Виртуальный список IDE (LVS_OWNERDATA)
     m_hListIDE = CreateWindowW(WC_LISTVIEWW, L"", WS_CHILD | WS_VISIBLE | WS_BORDER | LVS_REPORT | LVS_OWNERDATA | LVS_NOSORTHEADER,
         2, 25, 395, 690, m_hTab, NULL, GetModuleHandle(NULL), NULL);
     ListView_SetExtendedListViewStyle(m_hListIDE, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
 
-    // Виртуальный список IPL
     m_hListIPL = CreateWindowW(WC_LISTVIEWW, L"", WS_CHILD | WS_BORDER | LVS_REPORT | LVS_OWNERDATA | LVS_NOSORTHEADER,
         2, 25, 395, 690, m_hTab, NULL, GetModuleHandle(NULL), NULL);
     ListView_SetExtendedListViewStyle(m_hListIPL, LVS_EX_FULLROWSELECT | LVS_EX_GRIDLINES);
 
-    LVCOLUMNW lvc = { 0 };
-    lvc.mask = LVCF_TEXT | LVCF_WIDTH;
+    LVCOLUMNW lvc = { LVCF_TEXT | LVCF_WIDTH, 0, 0, nullptr, 0, 0, 0, 0 };
 
-    // Колонки IDE
     lvc.cx = 50; lvc.pszText = const_cast<LPWSTR>(L"ID"); ListView_InsertColumn(m_hListIDE, 0, &lvc);
     lvc.cx = 150; lvc.pszText = const_cast<LPWSTR>(L"Model"); ListView_InsertColumn(m_hListIDE, 1, &lvc);
     lvc.cx = 150; lvc.pszText = const_cast<LPWSTR>(L"TXD"); ListView_InsertColumn(m_hListIDE, 2, &lvc);
 
-    // Колонки IPL
     lvc.cx = 50; lvc.pszText = const_cast<LPWSTR>(L"ID"); ListView_InsertColumn(m_hListIPL, 0, &lvc);
     lvc.cx = 150; lvc.pszText = const_cast<LPWSTR>(L"Model"); ListView_InsertColumn(m_hListIPL, 1, &lvc);
     lvc.cx = 150; lvc.pszText = const_cast<LPWSTR>(L"Position"); ListView_InsertColumn(m_hListIPL, 2, &lvc);
@@ -106,16 +92,16 @@ bool Win32Window::IsRightMouseButtonPressed() const {
     return (GetAsyncKeyState(VK_RBUTTON) & 0x8000) != 0;
 }
 
-std::pair<float, float> Win32Window::GetMousePosition() const {
+void Win32Window::GetMousePosition(int& x, int& y) const {
     POINT pt;
     GetCursorPos(&pt);
     ScreenToClient(m_hWnd, &pt);
-    return { static_cast<float>(pt.x), static_cast<float>(pt.y) };
+    x = pt.x;
+    y = pt.y;
 }
 
 LRESULT CALLBACK Win32Window::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
     Win32Window* pThis = nullptr;
-
     if (uMsg == WM_NCCREATE) {
         CREATESTRUCT* pCreate = reinterpret_cast<CREATESTRUCT*>(lParam);
         pThis = reinterpret_cast<Win32Window*>(pCreate->lpCreateParams);
@@ -124,12 +110,7 @@ LRESULT CALLBACK Win32Window::WindowProc(HWND hwnd, UINT uMsg, WPARAM wParam, LP
     else {
         pThis = reinterpret_cast<Win32Window*>(GetWindowLongPtr(hwnd, GWLP_USERDATA));
     }
-
-    if (pThis) {
-        return pThis->HandleMessage(hwnd, uMsg, wParam, lParam);
-    }
-
-    return DefWindowProc(hwnd, uMsg, wParam, lParam);
+    return pThis ? pThis->HandleMessage(hwnd, uMsg, wParam, lParam) : DefWindowProc(hwnd, uMsg, wParam, lParam);
 }
 
 LRESULT Win32Window::HandleMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM lParam) {
@@ -151,7 +132,6 @@ LRESULT Win32Window::HandleMessage(HWND hwnd, UINT uMsg, WPARAM wParam, LPARAM l
 
         if (nmhdr->code == LVN_GETDISPINFOW) {
             NMLVDISPINFOW* plvdi = reinterpret_cast<NMLVDISPINFOW*>(lParam);
-
             if (plvdi->item.mask & LVIF_TEXT) {
                 if (nmhdr->hwndFrom == m_hListIDE && plvdi->item.iItem < (int)m_IDEData.size()) {
                     const auto& item = m_IDEData[plvdi->item.iItem];
