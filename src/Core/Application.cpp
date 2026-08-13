@@ -13,9 +13,37 @@
 
 #include <filesystem>
 #include <algorithm>
-#include <GL/gl.h> // Подключаем OpenGL заголовки
+#include <chrono>
+#include <GL/gl.h>
+#include <GL/glu.h>
 
 namespace fs = std::filesystem;
+
+static void DrawGrid() {
+    glDisable(GL_LIGHTING);
+    glLineWidth(1.0f);
+    glBegin(GL_LINES);
+
+    int size = 100;
+    int step = 10;
+
+    for (int i = -size; i <= size; i += step) {
+        if (i == 0) {
+            glColor3f(0.5f, 0.5f, 0.5f);
+        }
+        else {
+            glColor3f(0.25f, 0.25f, 0.25f);
+        }
+
+        glVertex3f((float)-size, 0.0f, (float)i);
+        glVertex3f((float)size, 0.0f, (float)i);
+
+        glVertex3f((float)i, 0.0f, (float)-size);
+        glVertex3f((float)i, 0.0f, (float)size);
+    }
+
+    glEnd();
+}
 
 Application::Application() : m_Running(true) {
     Logger::Init();
@@ -79,7 +107,6 @@ Application::Application() : m_Running(true) {
         }
         Logger::Info("IPL placements loaded: " + std::to_string(iplParser.GetPlacementCount()));
 
-        // Передаем данные в UI
         m_Window->SetIDEData(ideParser.GetObjectsList());
         m_Window->SetIPLData(iplParser.GetPlacements());
         Logger::Info("Data successfully passed to UI");
@@ -94,15 +121,43 @@ Application::~Application() {
 }
 
 void Application::Run() {
+    auto lastTime = std::chrono::high_resolution_clock::now();
+
     while (m_Running) {
         if (!m_Window->ProcessMessages()) {
             m_Running = false;
             break;
         }
 
-        glClearColor(0.1f, 0.1f, 0.15f, 1.0f);
+        auto currentTime = std::chrono::high_resolution_clock::now();
+        float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
+        lastTime = currentTime;
+
+        // Передаем deltaTime в камеру
+        if (m_Camera) {
+            m_Camera->Update(m_Window.get(), deltaTime);
+        }
+
+        glViewport(0, 0, 1280, 720);
+        glClearColor(0.12f, 0.12f, 0.16f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+        glEnable(GL_DEPTH_TEST);
+
+        glMatrixMode(GL_PROJECTION);
+        glLoadIdentity();
+        gluPerspective(45.0f, 1280.0f / 720.0f, 0.1f, 10000.0f);
+
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+
+        if (m_Camera) {
+            m_Camera->Update(m_Window.get(), deltaTime);
+        }
+
+        DrawGrid();
+
+        // Корректная смена буферов для Win32/OpenGL контекста
         ::SwapBuffers(wglGetCurrentDC());
     }
 }

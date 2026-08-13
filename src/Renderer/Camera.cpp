@@ -1,80 +1,80 @@
 #include "Camera.h"
-#include "Platform/Win32Window.h"
+#include "../Platform/Win32Window.h"
+#include <GL/gl.h>
+#include <GL/glu.h>
+#include <cmath>
 #include <windows.h>
-#include <gl/GL.h>
-#include <gl/GLU.h>
 
-Camera::Camera()
-    : m_Position(0.0f, 5.0f, 15.0f), m_Yaw(-90.0f), m_Pitch(-20.0f),
-    m_MoveSpeed(15.0f), m_MouseSensitivity(0.2f),
-    m_LastMouseX(0), m_LastMouseY(0), m_FirstMouse(true)
-{
-    m_Up = Vector3(0.0f, 1.0f, 0.0f);
-    UpdateVectors();
-}
+Camera::Camera() {}
+Camera::~Camera() {}
 
-void Camera::UpdateVectors() {
-    // Перевод углов в радианы
-    float radYaw = m_Yaw * 3.14159f / 180.0f;
-    float radPitch = m_Pitch * 3.14159f / 180.0f;
+void Camera::Update(Win32Window* window, float deltaTime) {
+    if (!window) return;
 
-    m_Front.x = std::cos(radYaw) * std::cos(radPitch);
-    m_Front.y = std::sin(radPitch);
-    m_Front.z = std::sin(radYaw) * std::cos(radPitch);
-    m_Front.Normalize();
+    float velocity = m_Speed * deltaTime;
+    if (window->IsKeyPressed('W')) {
+        m_PosX += velocity * sin(m_Yaw * 3.14159f / 180.0f);
+        m_PosZ -= velocity * cos(m_Yaw * 3.14159f / 180.0f);
+    }
+    if (window->IsKeyPressed('S')) {
+        m_PosX -= velocity * sin(m_Yaw * 3.14159f / 180.0f);
+        m_PosZ += velocity * cos(m_Yaw * 3.14159f / 180.0f);
+    }
+    if (window->IsKeyPressed('A')) {
+        m_PosX -= velocity * cos(m_Yaw * 3.14159f / 180.0f);
+        m_PosZ -= velocity * sin(m_Yaw * 3.14159f / 180.0f);
+    }
+    if (window->IsKeyPressed('D')) {
+        m_PosX += velocity * cos(m_Yaw * 3.14159f / 180.0f);
+        m_PosZ += velocity * sin(m_Yaw * 3.14159f / 180.0f);
+    }
+    if (window->IsKeyPressed(VK_SPACE)) {
+        m_PosY += velocity;
+    }
+    if (window->IsKeyPressed(VK_CONTROL)) {
+        m_PosY -= velocity;
+    }
 
-    m_Right = m_Front.Cross(m_Up);
-    m_Right.Normalize();
-}
+    if (window->IsRightMouseButtonPressed()) {
+        int mouseX = 0, mouseY = 0;
+        window->GetMousePosition(mouseX, mouseY);
 
-void Camera::Update(float deltaTime, const Win32Window& window) {
-    float velocity = m_MoveSpeed * deltaTime;
-
-    // Управление WASD
-    if (window.IsKeyPressed('W')) m_Position += m_Front * velocity;
-    if (window.IsKeyPressed('S')) m_Position -= m_Front * velocity;
-    if (window.IsKeyPressed('A')) m_Position -= m_Right * velocity;
-    if (window.IsKeyPressed('D')) m_Position += m_Right * velocity;
-
-    // Вверх/вниз
-    if (window.IsKeyPressed(VK_SPACE)) m_Position += m_Up * velocity;
-    if (window.IsKeyPressed(VK_SHIFT)) m_Position -= m_Up * velocity;
-
-    // Обзор мышью (при зажатой правой кнопке)
-    int mouseX, mouseY;
-    window.GetMousePosition(mouseX, mouseY);
-
-    if (window.IsRightMouseButtonPressed()) {
         if (m_FirstMouse) {
-            m_LastMouseX = mouseX;
-            m_LastMouseY = mouseY;
+            m_LastMouseX = static_cast<float>(mouseX);
+            m_LastMouseY = static_cast<float>(mouseY);
             m_FirstMouse = false;
         }
 
-        float xoffset = (float)(mouseX - m_LastMouseX) * m_MouseSensitivity;
-        float yoffset = (float)(m_LastMouseY - mouseY) * m_MouseSensitivity; // Инвертированный Y
+        float xoffset = static_cast<float>(mouseX) - m_LastMouseX;
+        float yoffset = m_LastMouseY - static_cast<float>(mouseY);
+        m_LastMouseX = static_cast<float>(mouseX);
+        m_LastMouseY = static_cast<float>(mouseY);
 
-        m_LastMouseX = mouseX;
-        m_LastMouseY = mouseY;
+        xoffset *= m_Sensitivity;
+        yoffset *= m_Sensitivity;
 
         m_Yaw += xoffset;
         m_Pitch += yoffset;
 
-        if (m_Pitch > 89.0f) m_Pitch = 89.0f;
+        if (m_Pitch > 89.0f)  m_Pitch = 89.0f;
         if (m_Pitch < -89.0f) m_Pitch = -89.0f;
-
-        UpdateVectors();
     }
     else {
-        m_FirstMouse = true; // Сброс при отпускании ПКМ
+        m_FirstMouse = true;
     }
 }
 
 void Camera::ApplyView() const {
-    Vector3 target = m_Position + m_Front;
+    float radPitch = m_Pitch * 3.14159f / 180.0f;
+    float radYaw = m_Yaw * 3.14159f / 180.0f;
+
+    float dirX = sin(radYaw) * cos(radPitch);
+    float dirY = sin(radPitch);
+    float dirZ = -cos(radYaw) * cos(radPitch);
+
     gluLookAt(
-        m_Position.x, m_Position.y, m_Position.z,
-        target.x, target.y, target.z,
-        m_Up.x, m_Up.y, m_Up.z
+        m_PosX, m_PosY, m_PosZ,
+        m_PosX + dirX, m_PosY + dirY, m_PosZ + dirZ,
+        0.0f, 1.0f, 0.0f
     );
 }
