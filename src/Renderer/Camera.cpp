@@ -5,33 +5,56 @@
 #include <cmath>
 #include <windows.h>
 
-Camera::Camera() {}
+Camera::Camera() {
+    m_Speed = 150.0f;
+}
+
 Camera::~Camera() {}
 
 void Camera::Update(Win32Window* window, float deltaTime) {
     if (!window) return;
 
     float velocity = m_Speed * deltaTime;
-    if (window->IsKeyPressed('W')) {
-        m_PosX += velocity * sin(m_Yaw * 3.14159f / 180.0f);
-        m_PosZ -= velocity * cos(m_Yaw * 3.14159f / 180.0f);
+
+    bool wPressed = (GetAsyncKeyState('W') & 0x8000) || (GetAsyncKeyState('w') & 0x8000) || (GetAsyncKeyState(VK_UP) & 0x8000);
+    bool sPressed = (GetAsyncKeyState('S') & 0x8000) || (GetAsyncKeyState('s') & 0x8000) || (GetAsyncKeyState(VK_DOWN) & 0x8000);
+    bool aPressed = (GetAsyncKeyState('A') & 0x8000) || (GetAsyncKeyState('a') & 0x8000) || (GetAsyncKeyState(VK_LEFT) & 0x8000);
+    bool dPressed = (GetAsyncKeyState('D') & 0x8000) || (GetAsyncKeyState('d') & 0x8000) || (GetAsyncKeyState(VK_RIGHT) & 0x8000);
+
+    float radPitch = m_Pitch * 3.14159f / 180.0f;
+    float radYaw = m_Yaw * 3.14159f / 180.0f;
+
+    // Полный вектор направления взгляда (включая высоту Y)
+    float frontX = sin(radYaw) * cos(radPitch);
+    float frontY = sin(radPitch);
+    float frontZ = -cos(radYaw) * cos(radPitch);
+
+    // Вектор стрейфа влево/вправо (параллельно плоскости земли)
+    float rightX = cos(radYaw);
+    float rightZ = sin(radYaw);
+
+    if (wPressed) {
+        m_PosX += frontX * velocity;
+        m_PosY += frontY * velocity;
+        m_PosZ += frontZ * velocity;
     }
-    if (window->IsKeyPressed('S')) {
-        m_PosX -= velocity * sin(m_Yaw * 3.14159f / 180.0f);
-        m_PosZ += velocity * cos(m_Yaw * 3.14159f / 180.0f);
+    if (sPressed) {
+        m_PosX -= frontX * velocity;
+        m_PosY -= frontY * velocity;
+        m_PosZ -= frontZ * velocity;
     }
-    if (window->IsKeyPressed('A')) {
-        m_PosX -= velocity * cos(m_Yaw * 3.14159f / 180.0f);
-        m_PosZ -= velocity * sin(m_Yaw * 3.14159f / 180.0f);
+    if (aPressed) {
+        m_PosX -= rightX * velocity;
+        m_PosZ -= rightZ * velocity;
     }
-    if (window->IsKeyPressed('D')) {
-        m_PosX += velocity * cos(m_Yaw * 3.14159f / 180.0f);
-        m_PosZ += velocity * sin(m_Yaw * 3.14159f / 180.0f);
+    if (dPressed) {
+        m_PosX += rightX * velocity;
+        m_PosZ += rightZ * velocity;
     }
-    if (window->IsKeyPressed(VK_SPACE)) {
+    if (GetAsyncKeyState(VK_SPACE) & 0x8000) {
         m_PosY += velocity;
     }
-    if (window->IsKeyPressed(VK_CONTROL)) {
+    if (GetAsyncKeyState(VK_CONTROL) & 0x8000) {
         m_PosY -= velocity;
     }
 
@@ -47,6 +70,7 @@ void Camera::Update(Win32Window* window, float deltaTime) {
 
         float xoffset = static_cast<float>(mouseX) - m_LastMouseX;
         float yoffset = m_LastMouseY - static_cast<float>(mouseY);
+
         m_LastMouseX = static_cast<float>(mouseX);
         m_LastMouseY = static_cast<float>(mouseY);
 

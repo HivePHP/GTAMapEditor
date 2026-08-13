@@ -123,6 +123,9 @@ Application::~Application() {
 void Application::Run() {
     auto lastTime = std::chrono::high_resolution_clock::now();
 
+    HWND hwnd = m_Window->GetHWND();
+    HDC hdc = GetDC(hwnd);
+
     while (m_Running) {
         if (!m_Window->ProcessMessages()) {
             m_Running = false;
@@ -133,11 +136,17 @@ void Application::Run() {
         float deltaTime = std::chrono::duration<float>(currentTime - lastTime).count();
         lastTime = currentTime;
 
-        // Передаем deltaTime в камеру
+        // Защита от скачков времени
+        if (deltaTime > 0.1f) {
+            deltaTime = 0.016f;
+        }
+
+        // Обновляем камеру
         if (m_Camera) {
             m_Camera->Update(m_Window.get(), deltaTime);
         }
 
+        // Рендеринг
         glViewport(0, 0, 1280, 720);
         glClearColor(0.12f, 0.12f, 0.16f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -152,12 +161,14 @@ void Application::Run() {
         glLoadIdentity();
 
         if (m_Camera) {
-            m_Camera->Update(m_Window.get(), deltaTime);
+            m_Camera->ApplyView();
         }
 
         DrawGrid();
 
-        // Корректная смена буферов для Win32/OpenGL контекста
-        ::SwapBuffers(wglGetCurrentDC());
+        // Вывод кадра на экран
+        ::SwapBuffers(hdc);
     }
+
+    ReleaseDC(hwnd, hdc);
 }
